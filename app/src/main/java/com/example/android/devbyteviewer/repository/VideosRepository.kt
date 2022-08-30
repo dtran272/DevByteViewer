@@ -16,3 +16,39 @@
  */
 
 package com.example.android.devbyteviewer.repository
+
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Transformations
+import com.example.android.devbyteviewer.database.VideoDatabase
+import com.example.android.devbyteviewer.database.asDomainModel
+import com.example.android.devbyteviewer.domain.Video
+import com.example.android.devbyteviewer.network.Network
+import com.example.android.devbyteviewer.network.asDatabaseModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Repository for fetching devbyte videos from the network and storing them on disk.
+ *
+ * @property database Database of videos
+ */
+class VideosRepository(private val database: VideoDatabase) {
+    /**
+     * A playlist of videos that can be shown on the screen.
+     */
+    val videos: LiveData<List<Video>> = Transformations.map(database.videoDao.getVideos()) {
+        it.asDomainModel()
+    }
+
+    /**
+     * Refreshes the videos stored in the offline cache(on disk).
+     *
+     */
+    suspend fun refreshVideos() {
+        withContext(Dispatchers.IO) {
+            val playlist = Network.devbytes.getPlaylist().await()
+
+            database.videoDao.insertAll(*playlist.asDatabaseModel())
+        }
+    }
+}
